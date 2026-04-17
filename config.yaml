@@ -1,0 +1,170 @@
+# OpenClaw 配置文件 - 主从Agent架构优化版
+# 配置说明：https://docs.openclaw.ai
+
+# ==================== 会话管理 ====================
+session:
+  # 多会话支持
+  max_concurrent_sessions: 4  # 最多同时运行4个子Agent
+  auto_cleanup_inactive_sessions: true  # 自动清理不活跃会话
+  inactive_session_timeout: 300  # 5分钟无活动自动销毁会话
+  
+  # 会话持久化
+  enable_session_persistence: true
+  session_storage_path: "./sessions"
+
+# ==================== 工具隔离 ====================
+tools:
+  # 每个会话独立的工具环境
+  per_session_isolation: true
+  
+  # 会话结束自动重置所有工具
+  auto_reset_on_session_end: true
+  
+  # 每个会话最多调用工具次数
+  max_tool_calls_per_session: 100
+  
+  # 工具调用超时
+  tool_call_timeout: 60
+
+# ==================== 资源限制 ====================
+resources:
+  # 每个子Agent内存限制
+  per_session_memory_limit: 512  # MB
+  
+  # CPU核心限制
+  per_session_cpu_limit: 1
+  
+  # 超过限制自动杀死会话
+  auto_kill_exceeding_limit: true
+  
+  # 全局内存限制
+  global_memory_limit: 2048  # MB
+
+# ==================== 模型配置 ====================
+model:
+  # 默认模型
+  default: "zhipu/glm-4-plus"
+  
+  # 备选模型
+  fallbacks:
+    - "deepseek/deepseek-chat"
+    - "openai/gpt-4-turbo-preview"
+  
+  # 模型参数
+  temperature: 0.3
+  max_tokens: 32768
+  top_p: 0.95
+
+# ==================== 日志配置 ====================
+logging:
+  # 日志级别
+  level: "INFO"  # DEBUG / INFO / WARNING / ERROR
+  
+  # 日志文件
+  file: "./logs/openclaw.log"
+  max_size: "10MB"
+  backup_count: 5
+  
+  # 控制台输出
+  console: true
+
+# ==================== 网络配置 ====================
+network:
+  # API请求超时
+  request_timeout: 120
+  
+  # 重试配置
+  retry_times: 3
+  retry_delay: 5
+  
+  # 代理配置（可选）
+  # proxy: "http://127.0.0.1:7890"
+
+# ==================== 安全配置 ====================
+security:
+  # API Key加密存储
+  encrypt_api_keys: true
+  
+  # 敏感信息过滤
+  filter_sensitive_info: true
+  
+  # 允许的文件路径
+  allowed_paths:
+    - "E:\\WORKS\\MiroLaw"
+    - "./output"
+    - "./logs"
+
+# ==================== Git集成 ====================
+git:
+  # 自动提交
+  auto_commit: true
+  commit_interval: 3  # 每3个子任务提交一次
+  
+  # 自动推送
+  auto_push: false
+  
+  # 分支管理
+  default_branch: "main"
+  feature_branch_prefix: "feature/"
+
+# ==================== 通知配置 ====================
+notification:
+  # 启用通知
+  enabled: false
+  
+  # Webhook地址
+  webhook: ""
+  
+  # 通知事件
+  events:
+    - "task_completed"
+    - "task_failed"
+    - "project_completed"
+
+# ==================== 高级功能 ====================
+advanced:
+  # 断点续传
+  checkpoint_enabled: true
+  checkpoint_interval: 2  # 每2个子任务保存一次
+  
+  # 性能监控
+  performance_monitoring: true
+  
+  # 自动优化
+  auto_optimization: true
+  
+  # 内存清理
+  auto_gc: true
+  gc_interval: 10  # 每10个子任务清理一次
+
+# ==================== 插件配置 ====================
+plugins:
+  # 启用的插件
+  enabled:
+    - "file_manager"
+    - "code_runner"
+    - "web_search"
+  
+  # 插件配置
+  file_manager:
+    max_file_size: "50MB"
+    allowed_extensions:
+      - ".py"
+      - ".md"
+      - ".txt"
+      - ".json"
+  
+  code_runner:
+    timeout: 60
+    max_output_size: "1MB"
+
+# ==================== 开发者选项 ====================
+developer:
+  # 调试模式
+  debug: false
+  
+  # 性能分析
+  profiling: false
+  
+  # 详细日志
+  verbose: false

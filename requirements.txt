@@ -1,0 +1,17 @@
+# OpenClaw 主从Agent架构依赖
+
+# API客户端
+zhipuai>=2.0.0
+openai>=1.0.0
+requests>=2.31.0
+
+# 数据处理
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+# 可选：进度通知
+# websocket-client>=1.6.0
+
+# 可选：高级功能
+# watchdog>=3.0.0  # 文件监控
+# redis>=5.0.0     # 缓存支持
