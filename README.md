@@ -88,15 +88,17 @@
 
 ## 🚀 快速开始
 
-### 方式一：下载可执行文件（推荐）
+### 方式一：下载桌面应用（推荐）
 
-直接下载 Windows 可执行文件，无需安装 Python 环境。
+直接下载 Windows 桌面应用，无需安装 Python 和浏览器。
 
 [![Download](https://img.shields.io/badge/下载-mirolaw--x64--Windows.exe-blue?style=for-the-badge)](https://github.com/23xxCh/Mirolaw/releases/latest)
 
 1. 下载 `mirolaw-x64-Windows.exe`
 2. 双击运行
-3. 浏览器自动打开 http://localhost:8000
+3. 桌面窗口自动打开，即可使用
+
+**特点**: 原生桌面应用体验，无需浏览器，双击即用。
 
 ### 方式二：源码运行
 
