@@ -1,0 +1,87 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 0.5.0)'
+        required: false
+        default: '0.5.0'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+
+    - name: Get version
+      id: version
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build executable
+      run: |
+        python build.py
+      env:
+        PYTHONPATH: .
+
+    - name: Create release package
+      shell: bash
+      run: |
+        cd release
+        7z a -tzip ../mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip *
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mirolaw-windows
+        path: release/
+
+    - name: Create Release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe
+          mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip
+        body: |
+          ## 电商合规哨兵 v${{ steps.version.outputs.VERSION }}
+
+          ### 下载
+          - `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` - 单文件版本
+          - `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip` - 完整发布包
+
+          ### 使用方法
+          1. 下载 exe 文件
+          2. 双击运行
+          3. 浏览器自动打开 http://localhost:8000
+
+          ### 功能
+          - 风险预测: 检测商品描述和营销文案中的合规风险
+          - 实时预警: WebSocket 实时推送风险预警
+          - 法律检索: 搜索相关法律条文
+          - 案例查询: 查看典型违规案例
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

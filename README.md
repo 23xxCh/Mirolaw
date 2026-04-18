@@ -88,12 +88,24 @@
 
 ## 🚀 快速开始
 
-### 环境要求
+### 方式一：下载可执行文件（推荐）
+
+直接下载 Windows 可执行文件，无需安装 Python 环境。
+
+[![Download](https://img.shields.io/badge/下载-mirolaw--0.5.0--x64--Windows.exe-blue?style=for-the-badge)](https://github.com/23xxCh/Mirolaw/releases/latest)
+
+1. 下载 `mirolaw-0.5.0-x64-Windows.exe`
+2. 双击运行
+3. 浏览器自动打开 http://localhost:8000
+
+### 方式二：源码运行
+
+#### 环境要求
 
 - Python 3.9+
 - pip 或 conda
 
-### 安装步骤
+#### 安装步骤
 
 ```bash
 # 1. 克隆仓库
@@ -128,6 +140,20 @@ docker run -d -p 8000:8000 --name mirolaw mirolaw:latest
 
 # 或使用 docker-compose
 docker-compose up -d
+```
+
+### 本地打包 exe
+
+如果你想在本地打包 Windows 可执行文件：
+
+```bash
+# 安装打包依赖
+pip install pyinstaller
+
+# 运行打包脚本
+python build.py
+
+# 输出文件在 release/ 目录
 ```
 
 ### 访问服务
