@@ -1,0 +1,19 @@
+# 电商合规哨兵 - 精简依赖（用于打包exe）
+
+# Web框架
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+websockets>=11.0
+
+# HTTP客户端
+httpx>=0.24.0
+python-dotenv>=1.0.0
+openai>=1.0.0
+
+# 数据处理
+python-dateutil>=2.8.2
+
+# 系统监控
+psutil>=5.9.0
