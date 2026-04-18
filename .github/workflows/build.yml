@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Windows Desktop App
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 0.5.0)'
+        description: 'Version number (e.g., 0.6.0)'
         required: false
-        default: '0.5.0'
+        default: '0.6.0'
 
 permissions:
   contents: write
@@ -44,7 +44,7 @@ jobs:
           echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
         fi
 
-    - name: Build executable
+    - name: Build desktop application
       run: |
         python build.py
       env:
@@ -60,7 +60,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: mirolaw-windows
+        name: mirolaw-desktop
         path: release/
 
     - name: Create Release
@@ -71,26 +71,33 @@ jobs:
           release/mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe
           mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip
         body: |
-          ## MiroLaw v${{ steps.version.outputs.VERSION }}
+          ## MiroLaw v${{ steps.version.outputs.VERSION }} - Desktop Application
+
+          A standalone desktop application for e-commerce compliance risk prediction.
 
           ### Download
           | File | Description |
           |------|-------------|
-          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` | Single file, run directly |
-          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip` | Full release package |
+          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` | Desktop application, double-click to run |
+          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip` | Full package with documentation |
 
           ### Usage
           1. Download the exe file
-          2. Double-click to run
-          3. Browser opens http://localhost:8000 automatically
+          2. Double-click to launch
+          3. A desktop window will open automatically
+          4. No browser or Python installation required!
 
           ### Features
-          - **Risk Prediction**: Detect compliance risks in product descriptions
-          - **Real-time Alerts**: WebSocket push notifications
-          - **Legal Search**: Search relevant laws and regulations
-          - **Case Library**: View typical violation cases
-          - **Fine Prediction**: Estimate potential fines
-          - **AI Suggestions**: Generate remediation plans
+          - Risk Prediction: Detect compliance risks in product descriptions
+          - Real-time Alerts: WebSocket push notifications
+          - Legal Search: Search relevant laws and regulations
+          - Case Library: View typical violation cases
+          - Fine Prediction: Estimate potential fines
+          - AI Suggestions: Generate remediation plans
+
+          ### Requirements
+          - Windows 10/11 (64-bit)
+          - No additional software needed
 
           ### Docs
           - [README](https://github.com/23xxCh/Mirolaw#readme)

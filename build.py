@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-MiroLaw - Windows Executable Build Script
+MiroLaw - Desktop Application Builder
 
-Build standalone Windows executable using PyInstaller
+Build standalone Windows desktop application using PyInstaller + PyWebView
 """
 
 import PyInstaller.__main__
@@ -14,21 +14,31 @@ from pathlib import Path
 
 # Fix Windows console encoding
 if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except:
+        pass
 
 # Project root
 ROOT_DIR = Path(__file__).parent
 
 # Build config
 APP_NAME = "mirolaw"
-VERSION = os.environ.get("BUILD_VERSION", "0.5.1")
+VERSION = os.environ.get("BUILD_VERSION", "0.6.0")
 
-# Entry point
-ENTRY_POINT = str(ROOT_DIR / "src" / "standalone.py")
+# Entry point - Desktop application
+ENTRY_POINT = str(ROOT_DIR / "src" / "desktop.py")
 
 # Hidden imports
 HIDDEN_IMPORTS = [
+    # Desktop GUI
+    "webview",
+    "webview.platforms",
+    "webview.platforms.winforms",
+    "clr",
+    "System",
+    "System.Windows.Forms",
     # uvicorn
     "uvicorn",
     "uvicorn.logging",
@@ -45,6 +55,7 @@ HIDDEN_IMPORTS = [
     "fastapi",
     "fastapi.responses",
     "fastapi.staticfiles",
+    "fastapi.templating",
     # pydantic
     "pydantic",
     "pydantic_core",
@@ -56,6 +67,7 @@ HIDDEN_IMPORTS = [
     "starlette.staticfiles",
     "starlette.requests",
     "starlette.datastructures",
+    "starlette.templating",
     # others
     "httpx",
     "httpx._transports",
@@ -72,8 +84,8 @@ HIDDEN_IMPORTS = [
     "email.utils",
     "multipart",
     "multipart.multipart",
-    "watchfiles",
-    "watchfiles.main",
+    "jinja2",
+    "markupsafe",
 ]
 
 # Excludes
@@ -88,16 +100,23 @@ EXCLUDES = [
     "IPython",
     "jupyter",
     "notebook",
+    "numpy",
+    "pandas",
+    "scipy",
+    "torch",
+    "transformers",
+    "sentence_transformers",
+    "faiss",
 ]
 
 
 def build_exe():
-    """Build Windows executable"""
+    """Build Windows desktop application"""
 
     print()
     print("=" * 60)
-    print(f"  MiroLaw v{VERSION}")
-    print("  Windows Executable Builder")
+    print(f"  MiroLaw Desktop v{VERSION}")
+    print("  Windows Application Builder")
     print("=" * 60)
     print()
 
@@ -122,7 +141,7 @@ def build_exe():
         ENTRY_POINT,
         "--name", f"{APP_NAME}-{VERSION}-x64-Windows",
         "--onefile",
-        "--console",
+        "--noconsole",  # Hide console window (desktop app)
         "--clean",
         "--noconfirm",
 
@@ -130,11 +149,13 @@ def build_exe():
         "--add-data", f"{ROOT_DIR / 'frontend' / 'public'};frontend/public",
 
         # Collect all dependencies
+        "--collect-all", "webview",
         "--collect-all", "uvicorn",
         "--collect-all", "fastapi",
         "--collect-all", "starlette",
         "--collect-all", "pydantic",
         "--collect-all", "pydantic_core",
+        "--collect-all", "jinja2",
     ]
 
     # Add hidden imports
@@ -146,7 +167,7 @@ def build_exe():
         args.extend(["--exclude-module", module])
 
     # Run PyInstaller
-    print("Building...")
+    print("Building desktop application...")
     print(f"Entry: {ENTRY_POINT}")
     print()
 
@@ -182,14 +203,14 @@ def build_exe():
 
         # Create readme
         readme = release_dir / "README.txt"
-        readme.write_text(f"""MiroLaw v{VERSION}
-========================
+        readme.write_text(f"""MiroLaw v{VERSION} - Desktop Application
+==========================================
 
 Usage:
-1. Run mirolaw-{VERSION}-x64-Windows.exe
-2. Wait for service to start (5-10 seconds)
-3. Browser will open http://localhost:8000 automatically
-4. For AI suggestions, rename .env.example to .env and add your API key
+1. Double-click mirolaw-{VERSION}-x64-Windows.exe
+2. A desktop window will open automatically
+3. Use the application in the window
+4. Close the window to exit
 
 Features:
 - Risk Prediction: Detect compliance risks in product descriptions
@@ -197,13 +218,14 @@ Features:
 - Legal Search: Search relevant laws and regulations
 - Case Library: View typical violation cases
 - Fine Prediction: Estimate potential fines
-- AI Suggestions: Generate remediation plans
+- AI Suggestions: Generate remediation plans (requires API key)
+
+Configuration:
+- Rename .env.example to .env and add your DeepSeek API key for AI features
 
 Support:
 - GitHub: https://github.com/23xxCh/Mirolaw
 - Issues: https://github.com/23xxCh/Mirolaw/issues
-
-Press Ctrl+C to stop the service
 """, encoding='utf-8')
 
         print(f"  Release: {release_dir}")
@@ -215,67 +237,5 @@ Press Ctrl+C to stop the service
         return None
 
 
-def build_portable():
-    """Build portable version (with dependencies directory)"""
-
-    print()
-    print("=" * 60)
-    print(f"  MiroLaw v{VERSION}")
-    print("  Portable Build")
-    print("=" * 60)
-    print()
-
-    args = [
-        ENTRY_POINT,
-        "--name", APP_NAME,
-        "--onedir",
-        "--clean",
-        "--noconfirm",
-
-        "--add-data", f"{ROOT_DIR / 'frontend' / 'public'};frontend/public",
-
-        "--collect-all", "uvicorn",
-        "--collect-all", "fastapi",
-        "--collect-all", "starlette",
-        "--collect-all", "pydantic",
-    ]
-
-    for module in HIDDEN_IMPORTS:
-        args.extend(["--hidden-import", module])
-
-    for module in EXCLUDES:
-        args.extend(["--exclude-module", module])
-
-    print("Building portable version...")
-
-    try:
-        PyInstaller.__main__.run(args)
-    except Exception as e:
-        print(f"Build error: {e}")
-        return None
-
-    dist_dir = ROOT_DIR / "dist" / APP_NAME
-
-    if dist_dir.exists():
-        # Copy config
-        shutil.copy(ROOT_DIR / ".env.example", dist_dir / ".env.example")
-        shutil.copy(ROOT_DIR / "config.yaml", dist_dir / "config.yaml")
-
-        print()
-        print("Portable build success!")
-        print(f"Output: {dist_dir}")
-
-        return dist_dir
-
-    return None
-
-
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--portable":
-        build_portable()
-    elif len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("Usage:")
-        print("  python build.py          # Build single exe file")
-        print("  python build.py --portable  # Build portable directory")
-    else:
-        build_exe()
+    build_exe()
