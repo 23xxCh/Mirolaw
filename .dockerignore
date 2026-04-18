@@ -1,0 +1,55 @@
+# 忽略Python缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 环境变量
+.env
+.env.local
+
+# 日志
+logs/
+*.log
+
+# 数据目录
+data/
+sessions/
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # API服务
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENABLE_LLM=${ENABLE_LLM:-true}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-chat}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis缓存（可选）
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # PostgreSQL + pgvector（可选，用于向量搜索）
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=mirolaw
+      - POSTGRES_PASSWORD=mirolaw123
+      - POSTGRES_DB=mirolaw
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:

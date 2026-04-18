@@ -59,8 +59,15 @@ Thumbs.db
 *.temp
 .cache/
 
+# 测试缓存
+.pytest_cache/
+.coverage
+htmlcov/
+
 # 数据文件
 *.csv
 *.xlsx
-*.json
-!package.json
+data/history/*.json
+
+# 研究目录
+research/

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电商合规哨兵 - MiroLaw</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="logo">🔔 电商合规哨兵</div>
+            <div class="nav-links">
+                <a href="#predict" class="active">风险预测</a>
+                <a href="#alerts">实时预警</a>
+                <a href="#laws">法律知识库</a>
+                <a href="#cases">案例库</a>
+            </div>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main>
+            <!-- 风险预测模块 -->
+            <section id="predict" class="section active">
+                <h2>🔍 合规风险预测</h2>
+                <div class="card">
+                    <div class="form-group">
+                        <label>产品名称</label>
+                        <input type="text" id="productName" placeholder="输入产品名称">
+                    </div>
+                    <div class="form-group">
+                        <label>产品描述</label>
+                        <textarea id="productDesc" rows="3" placeholder="输入产品描述内容"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>营销内容（每行一条）</label>
+                        <textarea id="marketingContent" rows="4" placeholder="输入营销文案，每行一条"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>企业规模</label>
+                            <select id="companySize">
+                                <option value="大型">大型企业</option>
+                                <option value="中型" selected>中型企业</option>
+                                <option value="小型">小型企业</option>
+                                <option value="微型">微型企业</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>年营业额（万元）</label>
+                            <input type="number" id="annualRevenue" value="1000">
+                        </div>
+                    </div>
+                    <button class="btn-primary" onclick="predictRisk()">开始预测</button>
+                </div>
+
+                <!-- 预测结果 -->
+                <div id="predictResult" class="result-container" style="display:none;">
+                    <h3>📊 预测结果</h3>
+                    <div class="score-card">
+                        <div class="score-value" id="overallScore">0</div>
+                        <div class="score-label">综合风险评分</div>
+                    </div>
+                    <div id="riskList" class="risk-list"></div>
+                    <div id="recommendation" class="recommendation"></div>
+                </div>
+            </section>
+
+            <!-- 法律知识库 -->
+            <section id="laws" class="section">
+                <h2>📚 法律知识库</h2>
+                <div class="search-box">
+                    <input type="text" id="lawSearch" placeholder="搜索法律条文...">
+                    <button class="btn-search" onclick="searchLaws()">搜索</button>
+                </div>
+                <div id="lawResults" class="law-results"></div>
+            </section>
+
+            <!-- 案例库 -->
+            <section id="cases" class="section">
+                <h2>📋 违规案例库</h2>
+                <div class="filter-bar">
+                    <select id="riskTypeFilter" onchange="filterCases()">
+                        <option value="">全部风险类型</option>
+                        <option value="虚假宣传">虚假宣传</option>
+                        <option value="价格欺诈">价格欺诈</option>
+                        <option value="知识产权侵权">知识产权侵权</option>
+                        <option value="不正当竞争">不正当竞争</option>
+                    </select>
+                </div>
+                <div id="caseList" class="case-list"></div>
+            </section>
+
+            <!-- 实时预警模块 -->
+            <section id="alerts" class="section">
+                <h2>🚨 实时预警中心</h2>
+
+                <!-- WebSocket状态 -->
+                <div class="card">
+                    <div class="alert-header">
+                        <span id="wsStatus" class="status-badge offline">未连接</span>
+                        <button class="btn-primary" onclick="connectWebSocket()">连接预警系统</button>
+                    </div>
+                </div>
+
+                <!-- 预警统计 -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-value" id="alertTotal">0</div>
+                        <div class="stat-label">总预警</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-value" id="alertActive">0</div>
+                        <div class="stat-label">活跃预警</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-value" id="alertWarning">0</div>
+                        <div class="stat-label">警告</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-value" id="alertDanger">0</div>
+                        <div class="stat-label">危险</div>
+                    </div>
+                </div>
+
+                <!-- 预警列表 -->
+                <div class="card">
+                    <h3>活跃预警</h3>
+                    <div id="alertList" class="alert-list">
+                        <p class="empty-message">暂无活跃预警</p>
+                    </div>
+                </div>
+
+                <!-- 预警规则 -->
+                <div class="card">
+                    <h3>预警规则</h3>
+                    <div id="alertRules" class="rules-list"></div>
+                </div>
+
+                <!-- 主动监控 -->
+                <div class="card">
+                    <h3>主动监控</h3>
+                    <div class="monitor-controls">
+                        <button class="btn-primary" onclick="startMonitor()">启动监控</button>
+                        <button class="btn-secondary" onclick="stopMonitor()">停止监控</button>
+                        <button class="btn-secondary" onclick="getMonitorStatus()">查看状态</button>
+                    </div>
+                    <div id="monitorStatus" class="monitor-status"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>© 2024 MiroLaw Team | 基于 DeepSeek AI</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
