@@ -1,27 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-电商合规哨兵 - Windows 可执行文件打包脚本
+MiroLaw - Windows Executable Build Script
 
-使用 PyInstaller 将应用打包为独立的 Windows exe 文件
+Build standalone Windows executable using PyInstaller
 """
 
 import PyInstaller.__main__
 import os
 import shutil
 import sys
+import io
 from pathlib import Path
 
-# 项目根目录
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Project root
 ROOT_DIR = Path(__file__).parent
 
-# 打包配置
+# Build config
 APP_NAME = "mirolaw"
 VERSION = "0.5.0"
 
-# 入口文件
+# Entry point
 ENTRY_POINT = str(ROOT_DIR / "src" / "standalone.py")
 
-# 隐式导入
+# Hidden imports
 HIDDEN_IMPORTS = [
     # uvicorn
     "uvicorn",
@@ -50,7 +56,7 @@ HIDDEN_IMPORTS = [
     "starlette.staticfiles",
     "starlette.requests",
     "starlette.datastructures",
-    # 其他
+    # others
     "httpx",
     "httpx._transports",
     "httpx._transports.default",
@@ -70,7 +76,7 @@ HIDDEN_IMPORTS = [
     "watchfiles.main",
 ]
 
-# 排除模块
+# Excludes
 EXCLUDES = [
     "matplotlib",
     "PIL",
@@ -86,44 +92,44 @@ EXCLUDES = [
 
 
 def build_exe():
-    """构建 Windows 可执行文件"""
+    """Build Windows executable"""
 
     print()
     print("=" * 60)
-    print(f"  电商合规哨兵 v{VERSION}")
-    print("  Windows 可执行文件打包工具")
+    print(f"  MiroLaw v{VERSION}")
+    print("  Windows Executable Builder")
     print("=" * 60)
     print()
 
-    # 清理旧的构建文件
+    # Clean old build files
     build_dir = ROOT_DIR / "build"
     dist_dir = ROOT_DIR / "dist"
     spec_file = ROOT_DIR / f"{APP_NAME}.spec"
 
     if build_dir.exists():
-        print("清理 build 目录...")
+        print("Cleaning build directory...")
         shutil.rmtree(build_dir)
 
     if dist_dir.exists():
-        print("清理 dist 目录...")
+        print("Cleaning dist directory...")
         shutil.rmtree(dist_dir)
 
     if spec_file.exists():
         spec_file.unlink()
 
-    # PyInstaller 参数
+    # PyInstaller args
     args = [
         ENTRY_POINT,
         "--name", f"{APP_NAME}-{VERSION}-x64-Windows",
-        "--onefile",           # 打包为单个文件
-        "--console",           # 控制台模式（方便查看日志）
-        "--clean",             # 清理临时文件
-        "--noconfirm",         # 不询问确认
+        "--onefile",
+        "--console",
+        "--clean",
+        "--noconfirm",
 
-        # 添加数据文件
+        # Add data files
         "--add-data", f"{ROOT_DIR / 'frontend' / 'public'};frontend/public",
 
-        # 收集所有依赖
+        # Collect all dependencies
         "--collect-all", "uvicorn",
         "--collect-all", "fastapi",
         "--collect-all", "starlette",
@@ -131,97 +137,98 @@ def build_exe():
         "--collect-all", "pydantic_core",
     ]
 
-    # 添加隐式导入
+    # Add hidden imports
     for module in HIDDEN_IMPORTS:
         args.extend(["--hidden-import", module])
 
-    # 排除不需要的模块
+    # Exclude modules
     for module in EXCLUDES:
         args.extend(["--exclude-module", module])
 
-    # 运行 PyInstaller
-    print("正在打包...")
-    print(f"入口: {ENTRY_POINT}")
+    # Run PyInstaller
+    print("Building...")
+    print(f"Entry: {ENTRY_POINT}")
     print()
 
     try:
         PyInstaller.__main__.run(args)
     except Exception as e:
-        print(f"打包出错: {e}")
+        print(f"Build error: {e}")
         return None
 
-    # 输出结果
+    # Check result
     exe_file = dist_dir / f"{APP_NAME}-{VERSION}-x64-Windows.exe"
 
     if exe_file.exists():
         print()
         print("=" * 60)
-        print("  打包成功!")
+        print("  Build Success!")
         print("=" * 60)
         print()
-        print(f"  输出文件: {exe_file}")
-        print(f"  文件大小: {exe_file.stat().st_size / 1024 / 1024:.2f} MB")
+        print(f"  Output: {exe_file}")
+        print(f"  Size: {exe_file.stat().st_size / 1024 / 1024:.2f} MB")
         print()
 
-        # 创建发布包
+        # Create release package
         release_dir = ROOT_DIR / "release"
         release_dir.mkdir(exist_ok=True)
 
-        # 复制 exe
+        # Copy exe
         release_exe = release_dir / f"{APP_NAME}-{VERSION}-x64-Windows.exe"
         shutil.copy(exe_file, release_exe)
 
-        # 复制配置文件
+        # Copy config
         shutil.copy(ROOT_DIR / ".env.example", release_dir / ".env.example")
 
-        # 创建启动说明
+        # Create readme
         readme = release_dir / "README.txt"
-        readme.write_text(f"""
-电商合规哨兵 v{VERSION}
+        readme.write_text(f"""MiroLaw v{VERSION}
 ========================
 
-使用方法:
-1. 双击运行 mirolaw-{VERSION}-x64-Windows.exe
-2. 等待服务启动（约5-10秒）
-3. 浏览器会自动打开 http://localhost:8000
-4. 如需使用智能建议功能，编辑 .env.example 为 .env 并填入 API Key
+Usage:
+1. Run mirolaw-{VERSION}-x64-Windows.exe
+2. Wait for service to start (5-10 seconds)
+3. Browser will open http://localhost:8000 automatically
+4. For AI suggestions, rename .env.example to .env and add your API key
 
-功能说明:
-- 风险预测: 检测商品描述和营销文案中的合规风险
-- 实时预警: WebSocket 实时推送风险预警
-- 法律检索: 搜索相关法律条文
-- 案例查询: 查看典型违规案例
+Features:
+- Risk Prediction: Detect compliance risks in product descriptions
+- Real-time Alerts: WebSocket push notifications
+- Legal Search: Search relevant laws and regulations
+- Case Library: View typical violation cases
+- Fine Prediction: Estimate potential fines
+- AI Suggestions: Generate remediation plans
 
-技术支持:
+Support:
 - GitHub: https://github.com/23xxCh/Mirolaw
-- 问题反馈: https://github.com/23xxCh/Mirolaw/issues
+- Issues: https://github.com/23xxCh/Mirolaw/issues
 
-按 Ctrl+C 停止服务
+Press Ctrl+C to stop the service
 """, encoding='utf-8')
 
-        print(f"  发布目录: {release_dir}")
+        print(f"  Release: {release_dir}")
         print()
 
         return exe_file
     else:
-        print("打包失败!")
+        print("Build failed!")
         return None
 
 
 def build_portable():
-    """构建便携版（带依赖目录）"""
+    """Build portable version (with dependencies directory)"""
 
     print()
     print("=" * 60)
-    print(f"  电商合规哨兵 v{VERSION}")
-    print("  便携版打包")
+    print(f"  MiroLaw v{VERSION}")
+    print("  Portable Build")
     print("=" * 60)
     print()
 
     args = [
         ENTRY_POINT,
         "--name", APP_NAME,
-        "--onedir",            # 打包为目录
+        "--onedir",
         "--clean",
         "--noconfirm",
 
@@ -239,24 +246,24 @@ def build_portable():
     for module in EXCLUDES:
         args.extend(["--exclude-module", module])
 
-    print("正在打包便携版...")
+    print("Building portable version...")
 
     try:
         PyInstaller.__main__.run(args)
     except Exception as e:
-        print(f"打包出错: {e}")
+        print(f"Build error: {e}")
         return None
 
     dist_dir = ROOT_DIR / "dist" / APP_NAME
 
     if dist_dir.exists():
-        # 复制配置文件
+        # Copy config
         shutil.copy(ROOT_DIR / ".env.example", dist_dir / ".env.example")
         shutil.copy(ROOT_DIR / "config.yaml", dist_dir / "config.yaml")
 
         print()
-        print("便携版打包成功!")
-        print(f"输出目录: {dist_dir}")
+        print("Portable build success!")
+        print(f"Output: {dist_dir}")
 
         return dist_dir
 
@@ -267,8 +274,8 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--portable":
         build_portable()
     elif len(sys.argv) > 1 and sys.argv[1] == "--help":
-        print("用法:")
-        print("  python build.py          # 打包为单个 exe 文件")
-        print("  python build.py --portable  # 打包为便携版目录")
+        print("Usage:")
+        print("  python build.py          # Build single exe file")
+        print("  python build.py --portable  # Build portable directory")
     else:
         build_exe()
