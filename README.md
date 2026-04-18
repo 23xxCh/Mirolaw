@@ -92,9 +92,9 @@
 
 直接下载 Windows 可执行文件，无需安装 Python 环境。
 
-[![Download](https://img.shields.io/badge/下载-mirolaw--0.5.0--x64--Windows.exe-blue?style=for-the-badge)](https://github.com/23xxCh/Mirolaw/releases/latest)
+[![Download](https://img.shields.io/badge/下载-mirolaw--x64--Windows.exe-blue?style=for-the-badge)](https://github.com/23xxCh/Mirolaw/releases/latest)
 
-1. 下载 `mirolaw-0.5.0-x64-Windows.exe`
+1. 下载 `mirolaw-x64-Windows.exe`
 2. 双击运行
 3. 浏览器自动打开 http://localhost:8000
 
