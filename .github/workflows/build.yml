@@ -11,6 +11,9 @@ on:
         required: false
         default: '0.5.0'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -46,6 +49,7 @@ jobs:
         python build.py
       env:
         PYTHONPATH: .
+        BUILD_VERSION: ${{ steps.version.outputs.VERSION }}
 
     - name: Create release package
       shell: bash
@@ -67,29 +71,28 @@ jobs:
           release/mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe
           mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip
         body: |
-          ## 🔔 电商合规哨兵 v${{ steps.version.outputs.VERSION }}
+          ## MiroLaw v${{ steps.version.outputs.VERSION }}
 
-          ### 📥 下载
-          | 文件 | 说明 |
-          |------|------|
-          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` | 单文件版本，直接运行 |
-          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip` | 完整发布包 |
+          ### Download
+          | File | Description |
+          |------|-------------|
+          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` | Single file, run directly |
+          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip` | Full release package |
 
-          ### 🚀 使用方法
-          1. 下载 exe 文件
-          2. 双击运行
-          3. 浏览器自动打开 http://localhost:8000
+          ### Usage
+          1. Download the exe file
+          2. Double-click to run
+          3. Browser opens http://localhost:8000 automatically
 
-          ### ✨ 功能
-          - **风险预测**: 检测商品描述和营销文案中的合规风险
-          - **实时预警**: WebSocket 实时推送风险预警
-          - **法律检索**: 搜索相关法律条文
-          - **案例查询**: 查看典型违规案例
-          - **罚款预测**: 预测潜在罚款金额
-          - **智能建议**: AI生成整改方案
+          ### Features
+          - **Risk Prediction**: Detect compliance risks in product descriptions
+          - **Real-time Alerts**: WebSocket push notifications
+          - **Legal Search**: Search relevant laws and regulations
+          - **Case Library**: View typical violation cases
+          - **Fine Prediction**: Estimate potential fines
+          - **AI Suggestions**: Generate remediation plans
 
-          ### 📚 文档
+          ### Docs
           - [README](https://github.com/23xxCh/Mirolaw#readme)
-          - [API文档](https://github.com/23xxCh/Mirolaw/blob/main/docs/API接口文档.md)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

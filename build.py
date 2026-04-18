@@ -22,7 +22,7 @@ ROOT_DIR = Path(__file__).parent
 
 # Build config
 APP_NAME = "mirolaw"
-VERSION = "0.5.0"
+VERSION = os.environ.get("BUILD_VERSION", "0.5.1")
 
 # Entry point
 ENTRY_POINT = str(ROOT_DIR / "src" / "standalone.py")
