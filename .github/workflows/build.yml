@@ -28,11 +28,7 @@ jobs:
         python-version: '3.11'
         cache: 'pip'
 
-    - name: Install Qt dependencies
-      run: |
-        pip install PySide6 PySide6-WebEngine
-
-    - name: Install application dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
@@ -80,26 +76,23 @@ jobs:
           ### Download
           | File | Description |
           |------|-------------|
-          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` | Desktop application, double-click to run |
+          | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.exe` | Desktop app, double-click to run |
           | `mirolaw-${{ steps.version.outputs.VERSION }}-x64-Windows.zip` | Full package |
 
           ### Usage
           1. Download the exe file
           2. Double-click to launch
           3. A desktop window opens automatically
-          4. No Python or browser needed!
-
-          ### Features
-          - Risk Prediction: Detect compliance risks
-          - Real-time Alerts: WebSocket push notifications
-          - Legal Search: Search laws and regulations
-          - Fine Prediction: Estimate potential fines
-          - AI Suggestions: Generate remediation plans
-          - System Tray: Minimize to tray, notifications
+          4. System tray icon for background monitoring
 
           ### Requirements
           - Windows 10/11 (64-bit)
-          - No additional software needed
+          - WebView2 runtime (pre-installed on Windows 10/11)
+
+          ### Features
+          - Risk Prediction, Real-time Alerts, Legal Search
+          - Fine Prediction, AI Suggestions
+          - System Tray, Notification Support
 
           ### Docs
           - [README](https://github.com/23xxCh/Mirolaw#readme)

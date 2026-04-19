@@ -2,7 +2,7 @@
 """
 MiroLaw v0.7.0 - Desktop Application Builder
 
-Build standalone Windows desktop application using PyInstaller + PySide6
+Build standalone Windows desktop application using PyInstaller + pywebview
 """
 
 import PyInstaller.__main__
@@ -27,19 +27,23 @@ ROOT_DIR = Path(__file__).parent
 APP_NAME = "mirolaw"
 VERSION = os.environ.get("BUILD_VERSION", "0.7.0")
 
-# Entry point - Desktop application
+# Entry point
 ENTRY_POINT = str(ROOT_DIR / "src" / "desktop.py")
 
 # Hidden imports
-HIDDEN_IMPORTS = [
-    # PySide6 / Qt
-    "PySide6",
-    "PySide6.QtWidgets",
-    "PySide6.QtCore",
-    "PySide6.QtGui",
-    "PySide6.QtWebEngineWidgets",
-    "PySide6.QtWebEngineCore",
-    "PySide6.QtNetwork",
+HIDDEN_IMPORTs = [
+    # pywebview + tray
+    "webview",
+    "webview.platforms",
+    "webview.platforms.winforms",
+    "clr",
+    "System",
+    "System.Windows.Forms",
+    "System.Drawing",
+    "pystray",
+    "PIL",
+    "PIL.Image",
+    "PIL.ImageDraw",
     # uvicorn
     "uvicorn",
     "uvicorn.logging",
@@ -89,10 +93,9 @@ HIDDEN_IMPORTS = [
     "markupsafe",
 ]
 
-# Excludes
+# Excludes (heavy packages not needed)
 EXCLUDES = [
     "matplotlib",
-    "PIL",
     "tkinter",
     "unittest",
     "test",
@@ -105,6 +108,10 @@ EXCLUDES = [
     "transformers",
     "sentence_transformers",
     "faiss",
+    "numpy",
+    "pandas",
+    "scipy",
+    "PySide6",
 ]
 
 
@@ -114,12 +121,12 @@ def build_exe():
     print()
     print("=" * 60)
     print(f"  MiroLaw Desktop v{VERSION}")
-    print("  Windows Application Builder (PySide6)")
+    print("  Windows Application Builder (pywebview)")
     print("=" * 60)
     print()
 
     # Clean old build files
-    for d in [ROOT_DIR / "build", ROOT_DIR / "dist"]:
+    for d in [ROOT_DIR / "build", ROOT_DIR / "dist", ROOT_DIR / "release"]:
         if d.exists():
             print(f"Cleaning {d}...")
             shutil.rmtree(d)
@@ -133,24 +140,29 @@ def build_exe():
         ENTRY_POINT,
         "--name", f"{APP_NAME}-{VERSION}-x64-Windows",
         "--onefile",
-        "--noconsole",  # No console window for desktop app
+        "--noconsole",  # No console window
         "--clean",
         "--noconfirm",
 
         # Add data files
         "--add-data", f"{ROOT_DIR / 'frontend' / 'public'};frontend/public",
 
-        # Add icon if exists
+        # Collect all dependencies
+        "--collect-all", "uvicorn",
+        "--collect-all", "fastapi",
+        "--collect-all", "starlette",
+        "--collect-all", "pydantic",
+        "--collect-all", "pydantic_core",
+        "--collect-all", "jinja2",
+        "--collect-all", "webview",
+        "--collect-all", "pystray",
+        "--collect-all", "PIL",
     ]
 
+    # Add icon if exists
     icon_path = ROOT_DIR / "assets" / "icon.ico"
     if icon_path.exists():
         args.extend(["--icon", str(icon_path)])
-
-    # Collect all dependencies
-    collect_all = ["uvicorn", "fastapi", "starlette", "pydantic", "pydantic_core", "jinja2"]
-    for pkg in collect_all:
-        args.extend(["--collect-all", pkg])
 
     # Add hidden imports
     for module in HIDDEN_IMPORTS:
@@ -163,7 +175,7 @@ def build_exe():
     # Run PyInstaller
     print("Building desktop application...")
     print(f"Entry: {ENTRY_POINT}")
-    print(f"Framework: PySide6 (Qt6)")
+    print(f"Framework: pywebview + pystray")
     print()
 
     try:
@@ -203,23 +215,24 @@ def build_exe():
 
 Usage:
 1. Double-click mirolaw-{VERSION}-x64-Windows.exe
-2. A desktop window will open automatically
-3. Use the application in the window
-4. Close the window to exit (or minimize to tray)
+2. A desktop window opens automatically
+3. Close the window or use tray icon to exit
+
+Requirements:
+- Windows 10/11 (64-bit) with WebView2 (pre-installed on most systems)
+- If WebView2 is missing, the app will prompt to install it
 
 Features:
 - Risk Prediction: Detect compliance risks
-- Real-time Alerts: WebSocket push notifications
+- Real-time Alerts: WebSocket notifications
 - Legal Search: Search laws and regulations
-- Case Library: View violation cases
 - Fine Prediction: Estimate potential fines
-- AI Suggestions: Generate remediation plans
+- System Tray: Minimize to tray
 
 Configuration:
 - Rename .env.example to .env and add your DeepSeek API key
 
-Support:
-- GitHub: https://github.com/23xxCh/Mirolaw
+Support: https://github.com/23xxCh/Mirolaw
 """, encoding='utf-8')
 
         print(f"  Release: {release_dir}")
