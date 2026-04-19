@@ -31,7 +31,7 @@ VERSION = os.environ.get("BUILD_VERSION", "0.7.0")
 ENTRY_POINT = str(ROOT_DIR / "src" / "desktop.py")
 
 # Hidden imports
-HIDDEN_IMPORTs = [
+HIDDEN_IMPORTS = [
     # pywebview + tray
     "webview",
     "webview.platforms",
