@@ -3,158 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>电商合规哨兵 - MiroLaw</title>
+    <title>MiroLaw - E-commerce Compliance Sentinel</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- 导航栏 -->
-        <nav class="navbar">
-            <div class="logo">🔔 电商合规哨兵</div>
-            <div class="nav-links">
-                <a href="#predict" class="active">风险预测</a>
-                <a href="#alerts">实时预警</a>
-                <a href="#laws">法律知识库</a>
-                <a href="#cases">案例库</a>
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">ML</div>
+                <div class="brand">
+                    <div class="brand-name">MiroLaw</div>
+                    <div class="brand-sub">Compliance Sentinel</div>
+                </div>
+            </div>
+            <ul class="nav-list">
+                <li class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">&#9776;</span>
+                    <span class="nav-text">Dashboard</span>
+                </li>
+                <li class="nav-item" data-page="predict">
+                    <span class="nav-icon">&#9888;</span>
+                    <span class="nav-text">Risk Prediction</span>
+                </li>
+                <li class="nav-item" data-page="alerts">
+                    <span class="nav-icon">&#128276;</span>
+                    <span class="nav-text">Alerts</span>
+                </li>
+                <li class="nav-item" data-page="knowledge">
+                    <span class="nav-icon">&#128214;</span>
+                    <span class="nav-text">Legal Search</span>
+                </li>
+                <li class="nav-item" data-page="history">
+                    <span class="nav-icon">&#128200;</span>
+                    <span class="nav-text">History</span>
+                </li>
+                <li class="nav-item" data-page="settings">
+                    <span class="nav-icon">&#9881;</span>
+                    <span class="nav-text">Settings</span>
+                </li>
+            </ul>
+            <div class="sidebar-footer">
+                <div class="ws-status" id="ws-status">
+                    <span class="ws-dot ws-disconnected"></span>
+                    <span>Connecting...</span>
+                </div>
+                <div class="version-info">v0.7.0</div>
             </div>
         </nav>
 
-        <!-- 主内容区 -->
-        <main>
-            <!-- 风险预测模块 -->
-            <section id="predict" class="section active">
-                <h2>🔍 合规风险预测</h2>
-                <div class="card">
-                    <div class="form-group">
-                        <label>产品名称</label>
-                        <input type="text" id="productName" placeholder="输入产品名称">
-                    </div>
-                    <div class="form-group">
-                        <label>产品描述</label>
-                        <textarea id="productDesc" rows="3" placeholder="输入产品描述内容"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>营销内容（每行一条）</label>
-                        <textarea id="marketingContent" rows="4" placeholder="输入营销文案，每行一条"></textarea>
-                    </div>
-                    <div class="form-row">
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <div class="page active" id="dashboard">
+                <div class="page-header">
+                    <h1>Dashboard</h1>
+                    <p class="page-desc">System overview and quick actions</p>
+                </div>
+                <div id="dashboard-content">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+
+            <!-- Risk Prediction Page -->
+            <div class="page" id="predict">
+                <div class="page-header">
+                    <h1>Risk Prediction</h1>
+                    <p class="page-desc">Analyze product descriptions and marketing content for compliance risks</p>
+                </div>
+                <div class="predict-layout">
+                    <div class="predict-form">
                         <div class="form-group">
-                            <label>企业规模</label>
-                            <select id="companySize">
-                                <option value="大型">大型企业</option>
-                                <option value="中型" selected>中型企业</option>
-                                <option value="小型">小型企业</option>
-                                <option value="微型">微型企业</option>
-                            </select>
+                            <label>Product Description</label>
+                            <textarea id="product-desc" rows="4" placeholder="Enter product description, e.g.: World's first technology, 100% effective..."></textarea>
                         </div>
                         <div class="form-group">
-                            <label>年营业额（万元）</label>
-                            <input type="number" id="annualRevenue" value="1000">
+                            <label>Marketing Content</label>
+                            <textarea id="marketing-text" rows="4" placeholder="Enter marketing text, e.g.: National certified, best choice..."></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Horizon (days)</label>
+                                <input type="number" id="horizon" value="30" min="1" max="365">
+                            </div>
+                            <div class="form-group form-actions">
+                                <button class="btn btn-primary btn-lg" onclick="submitPrediction()">Predict Risk</button>
+                                <button class="btn btn-secondary" onclick="loadSamplePrediction()">Demo</button>
+                            </div>
                         </div>
                     </div>
-                    <button class="btn-primary" onclick="predictRisk()">开始预测</button>
-                </div>
-
-                <!-- 预测结果 -->
-                <div id="predictResult" class="result-container" style="display:none;">
-                    <h3>📊 预测结果</h3>
-                    <div class="score-card">
-                        <div class="score-value" id="overallScore">0</div>
-                        <div class="score-label">综合风险评分</div>
-                    </div>
-                    <div id="riskList" class="risk-list"></div>
-                    <div id="recommendation" class="recommendation"></div>
-                </div>
-            </section>
-
-            <!-- 法律知识库 -->
-            <section id="laws" class="section">
-                <h2>📚 法律知识库</h2>
-                <div class="search-box">
-                    <input type="text" id="lawSearch" placeholder="搜索法律条文...">
-                    <button class="btn-search" onclick="searchLaws()">搜索</button>
-                </div>
-                <div id="lawResults" class="law-results"></div>
-            </section>
-
-            <!-- 案例库 -->
-            <section id="cases" class="section">
-                <h2>📋 违规案例库</h2>
-                <div class="filter-bar">
-                    <select id="riskTypeFilter" onchange="filterCases()">
-                        <option value="">全部风险类型</option>
-                        <option value="虚假宣传">虚假宣传</option>
-                        <option value="价格欺诈">价格欺诈</option>
-                        <option value="知识产权侵权">知识产权侵权</option>
-                        <option value="不正当竞争">不正当竞争</option>
-                    </select>
-                </div>
-                <div id="caseList" class="case-list"></div>
-            </section>
-
-            <!-- 实时预警模块 -->
-            <section id="alerts" class="section">
-                <h2>🚨 实时预警中心</h2>
-
-                <!-- WebSocket状态 -->
-                <div class="card">
-                    <div class="alert-header">
-                        <span id="wsStatus" class="status-badge offline">未连接</span>
-                        <button class="btn-primary" onclick="connectWebSocket()">连接预警系统</button>
+                    <div class="predict-result" id="prediction-result">
+                        <div class="empty-state">
+                            <div class="empty-icon">&#128270;</div>
+                            <p>Enter product info and click Predict</p>
+                            <p class="empty-hint">Or click Demo to try a sample prediction</p>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 预警统计 -->
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="stat-value" id="alertTotal">0</div>
-                        <div class="stat-label">总预警</div>
+            <!-- Alerts Page -->
+            <div class="page" id="alerts">
+                <div class="page-header">
+                    <h1>Alerts</h1>
+                    <p class="page-desc">Real-time compliance risk alerts</p>
+                </div>
+                <div id="alert-stats" class="alert-stats-row"></div>
+                <div class="alert-filters">
+                    <button class="alert-filter-btn active" data-filter="all" onclick="filterAlerts('all')">All</button>
+                    <button class="alert-filter-btn" data-filter="info" onclick="filterAlerts('info')">Info</button>
+                    <button class="alert-filter-btn" data-filter="warning" onclick="filterAlerts('warning')">Warning</button>
+                    <button class="alert-filter-btn" data-filter="danger" onclick="filterAlerts('danger')">Danger</button>
+                    <button class="alert-filter-btn" data-filter="critical" onclick="filterAlerts('critical')">Critical</button>
+                </div>
+                <div id="alert-list"></div>
+            </div>
+
+            <!-- Knowledge Search Page -->
+            <div class="page" id="knowledge">
+                <div class="page-header">
+                    <h1>Legal Search</h1>
+                    <p class="page-desc">Search laws, regulations, and violation cases</p>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="knowledge-search" placeholder="Search laws, cases, keywords..." class="search-input">
+                    <button class="btn btn-primary" onclick="searchKnowledge()">Search</button>
+                </div>
+                <div class="knowledge-layout">
+                    <div class="law-sidebar" id="law-list">
+                        <div class="loading-spinner"></div>
                     </div>
-                    <div class="stat-card danger">
-                        <div class="stat-value" id="alertActive">0</div>
-                        <div class="stat-label">活跃预警</div>
-                    </div>
-                    <div class="stat-card warning">
-                        <div class="stat-value" id="alertWarning">0</div>
-                        <div class="stat-label">警告</div>
-                    </div>
-                    <div class="stat-card danger">
-                        <div class="stat-value" id="alertDanger">0</div>
-                        <div class="stat-label">危险</div>
+                    <div class="knowledge-main" id="knowledge-results">
+                        <div class="empty-state">
+                            <div class="empty-icon">&#128269;</div>
+                            <p>Search or select a law to view details</p>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 预警列表 -->
-                <div class="card">
-                    <h3>活跃预警</h3>
-                    <div id="alertList" class="alert-list">
-                        <p class="empty-message">暂无活跃预警</p>
+            <!-- History Page -->
+            <div class="page" id="history">
+                <div class="page-header">
+                    <h1>Prediction History</h1>
+                    <p class="page-desc">Track prediction records and risk trends</p>
+                </div>
+                <div id="history-stats" class="history-stats-row"></div>
+                <div class="history-layout">
+                    <div class="history-chart">
+                        <canvas id="trend-canvas" width="500" height="200"></canvas>
+                    </div>
+                    <div class="history-records" id="history-records">
+                        <div class="loading-spinner"></div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 预警规则 -->
-                <div class="card">
-                    <h3>预警规则</h3>
-                    <div id="alertRules" class="rules-list"></div>
+            <!-- Settings Page -->
+            <div class="page" id="settings">
+                <div class="page-header">
+                    <h1>Settings</h1>
+                    <p class="page-desc">Application configuration</p>
                 </div>
-
-                <!-- 主动监控 -->
-                <div class="card">
-                    <h3>主动监控</h3>
-                    <div class="monitor-controls">
-                        <button class="btn-primary" onclick="startMonitor()">启动监控</button>
-                        <button class="btn-secondary" onclick="stopMonitor()">停止监控</button>
-                        <button class="btn-secondary" onclick="getMonitorStatus()">查看状态</button>
-                    </div>
-                    <div id="monitorStatus" class="monitor-status"></div>
+                <div id="settings-content">
+                    <div class="loading-spinner"></div>
                 </div>
-            </section>
+            </div>
         </main>
-
-        <!-- 页脚 -->
-        <footer>
-            <p>© 2024 MiroLaw Team | 基于 DeepSeek AI</p>
-        </footer>
     </div>
 
     <script src="app.js"></script>

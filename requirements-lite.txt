@@ -1,7 +1,8 @@
 # MiroLaw Desktop - Minimal Dependencies
 
 # Desktop GUI
-pywebview>=4.0
+PySide6>=6.5.0
+PySide6-WebEngine>=6.5.0
 
 # Web Framework
 fastapi>=0.100.0

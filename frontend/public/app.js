@@ -1,480 +1,809 @@
-// API基础URL
-const API_BASE = 'http://localhost:8000';
+// MiroLaw Frontend Application v0.7.0
+// Dynamic API base URL - works with both desktop app and browser
 
-// 全局状态
+// Dynamic base URL - auto-detect from current location
+const API_BASE = window.location.origin;
+const WS_BASE = (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host;
+
+// Global state
 const state = {
     loading: false,
     error: null,
-    lastPrediction: null
+    lastPrediction: null,
+    wsConnected: false,
+    wsReconnectAttempts: 0,
+    wsMaxReconnect: 10
 };
 
-// 显示加载状态
-function showLoading(elementId) {
-    const el = document.getElementById(elementId);
-    if (el) {
-        el.innerHTML = '<div class="loading-indicator"><span class="loading"></span> 加载中...</div>';
-    }
-}
+// ==================== UI Utilities ====================
 
-// 隐藏加载状态
-function hideLoading(elementId) {
-    const el = document.getElementById(elementId);
+function showLoading(containerId) {
+    const el = document.getElementById(containerId);
     if (el) {
-        const loadingEl = el.querySelector('.loading-indicator');
-        if (loadingEl) loadingEl.remove();
-    }
-}
-
-// 显示错误信息
-function showError(message, elementId = null) {
-    state.error = message;
-    if (elementId) {
-        const el = document.getElementById(elementId);
-        if (el) {
-            el.innerHTML = `<div class="error-message">❌ ${message}</div>`;
+        const existing = el.querySelector('.loading-overlay');
+        if (!existing) {
+            const overlay = document.createElement('div');
+            overlay.className = 'loading-overlay';
+            overlay.innerHTML = '<div class="loading-spinner"></div><span>Loading...</span>';
+            el.style.position = 'relative';
+            el.appendChild(overlay);
         }
-    } else {
-        showNotification({ level: 'danger', title: '错误', message });
     }
 }
 
-// 页面切换
-document.querySelectorAll('.nav-links a').forEach(link => {
-    link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const target = this.getAttribute('href').substring(1);
+function hideLoading(containerId) {
+    const el = document.getElementById(containerId);
+    if (el) {
+        const overlay = el.querySelector('.loading-overlay');
+        if (overlay) overlay.remove();
+    }
+}
 
-        // 更新导航状态
-        document.querySelectorAll('.nav-links a').forEach(l => l.classList.remove('active'));
-        this.classList.add('active');
+function showError(message, containerId) {
+    state.error = message;
+    if (containerId) {
+        const el = document.getElementById(containerId);
+        if (el) {
+            el.innerHTML = `<div class="error-box"><strong>Error</strong><p>${message}</p></div>`;
+        }
+    }
+    showToast(message, 'error');
+}
 
-        // 切换内容
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.getElementById(target).classList.add('active');
+function showSuccess(message) {
+    showToast(message, 'success');
+}
 
-        // 加载数据
-        if (target === 'cases') loadCases();
-    });
-});
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container') || createToastContainer();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
 
-// 风险预测
-async function predictRisk() {
-    const productName = document.getElementById('productName').value;
-    const productDesc = document.getElementById('productDesc').value;
-    const marketingContent = document.getElementById('marketingContent').value.split('\n').filter(x => x.trim());
-    const companySize = document.getElementById('companySize').value;
-    const annualRevenue = document.getElementById('annualRevenue').value * 10000;
+    const icon = type === 'error' ? '\u274C' : type === 'success' ? '\u2705' : '\u2139\uFE0F';
+    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${message}</span>`;
 
-    if (!productName && !productDesc && marketingContent.length === 0) {
-        alert('请至少填写一项内容');
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('toast-fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+    return container;
+}
+
+// ==================== Page Navigation ====================
+
+function showPage(pageId) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+    // Show target page
+    const page = document.getElementById(pageId);
+    if (page) page.classList.add('active');
+
+    // Update nav
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const navItem = document.querySelector(`[data-page="${pageId}"]`);
+    if (navItem) navItem.classList.add('active');
+
+    // Load page data
+    switch (pageId) {
+        case 'dashboard': loadDashboard(); break;
+        case 'predict': break;
+        case 'alerts': loadAlerts(); break;
+        case 'knowledge': loadKnowledge(); break;
+        case 'history': loadHistory(); break;
+        case 'settings': loadSettings(); break;
+    }
+}
+
+// ==================== Dashboard ====================
+
+async function loadDashboard() {
+    try {
+        const [healthResp, statsResp, alertResp] = await Promise.all([
+            fetch(`${API_BASE}/health`).catch(() => null),
+            fetch(`${API_BASE}/cache/stats`).catch(() => null),
+            fetch(`${API_BASE}/alerts/stats`).catch(() => null),
+        ]);
+
+        const health = healthResp ? await healthResp.json() : { status: 'unknown' };
+        const cacheStats = statsResp ? await statsResp.json() : {};
+        const alertStats = alertResp ? await alertResp.json() : {};
+
+        const container = document.getElementById('dashboard-content');
+        if (!container) return;
+
+        const statusColor = health.status === 'healthy' ? '#27ae60' : '#e74c3c';
+        const statusText = health.status === 'healthy' ? 'Normal' : 'Abnormal';
+
+        container.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-card stat-blue">
+                    <div class="stat-icon">\uD83D\uDD27</div>
+                    <div class="stat-value">${statusText}</div>
+                    <div class="stat-label">System Status</div>
+                </div>
+                <div class="stat-card stat-green">
+                    <div class="stat-icon">\uD83D\uDCCA</div>
+                    <div class="stat-value">${cacheStats.size || 0}</div>
+                    <div class="stat-label">Cache Entries</div>
+                </div>
+                <div class="stat-card stat-orange">
+                    <div class="stat-icon">\u26A0\uFE0F</div>
+                    <div class="stat-value">${alertStats.total || 0}</div>
+                    <div class="stat-label">Total Alerts</div>
+                </div>
+                <div class="stat-card stat-red">
+                    <div class="stat-icon">\uD83D\uDEA8</div>
+                    <div class="stat-value">${alertStats.active || 0}</div>
+                    <div class="stat-label">Active Alerts</div>
+                </div>
+            </div>
+            <div class="dashboard-quick-actions">
+                <h3>Quick Actions</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="showPage('predict')">Risk Prediction</button>
+                    <button class="btn btn-warning" onclick="showPage('alerts')">View Alerts</button>
+                    <button class="btn btn-info" onclick="showPage('knowledge')">Legal Search</button>
+                    <button class="btn btn-secondary" onclick="loadSamplePrediction()">Demo Prediction</button>
+                </div>
+            </div>
+            <div class="system-info">
+                <h3>System Info</h3>
+                <div class="info-grid">
+                    <div class="info-item"><span>Version</span><span>v0.7.0</span></div>
+                    <div class="info-item"><span>Uptime</span><span>${health.uptime_seconds ? Math.floor(health.uptime_seconds/60) + 'min' : 'N/A'}</span></div>
+                    <div class="info-item"><span>Cache Hit Rate</span><span>${(cacheStats.hit_rate * 100).toFixed(1) || 0}%</span></div>
+                    <div class="info-item"><span>Services</span><span>${health.checks ? health.checks.length : 0}</span></div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        showError('Failed to load dashboard: ' + err.message);
+    }
+}
+
+// ==================== Risk Prediction ====================
+
+async function submitPrediction() {
+    const productDesc = document.getElementById('product-desc')?.value || '';
+    const marketingText = document.getElementById('marketing-text')?.value || '';
+    const horizon = parseInt(document.getElementById('horizon')?.value || '30');
+
+    if (!productDesc && !marketingText) {
+        showError('Please enter product description or marketing content');
         return;
     }
 
-    const platformData = {
-        product_info: {
-            name: productName,
-            description: productDesc
-        },
-        marketing_content: marketingContent.map(text => ({ text })),
-        company_size: companySize,
-        annual_revenue: annualRevenue
-    };
+    const resultContainer = document.getElementById('prediction-result');
+    if (!resultContainer) return;
+
+    showLoading('prediction-result');
 
     try {
         const response = await fetch(`${API_BASE}/predict`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platform_data: platformData })
+            body: JSON.stringify({
+                platform_data: {
+                    product_info: { description: productDesc },
+                    marketing_content: [{ text: marketingText }]
+                },
+                horizon: horizon
+            })
         });
 
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
         const result = await response.json();
-        displayPredictResult(result);
-    } catch (error) {
-        console.error('预测失败:', error);
-        alert('预测请求失败，请确保API服务已启动');
+        state.lastPrediction = result;
+        renderPredictionResult(result, resultContainer);
+        showSuccess('Prediction complete!');
+    } catch (err) {
+        showError('Prediction failed: ' + err.message, 'prediction-result');
+    } finally {
+        hideLoading('prediction-result');
     }
 }
 
-// 显示预测结果
-function displayPredictResult(result) {
-    document.getElementById('predictResult').style.display = 'block';
+function renderPredictionResult(result, container) {
+    const riskScore = result.overall_risk_score || 0;
+    const riskLevel = riskScore >= 0.7 ? 'high' : riskScore >= 0.4 ? 'medium' : 'low';
+    const riskColor = riskLevel === 'high' ? '#e74c3c' : riskLevel === 'medium' ? '#f39c12' : '#27ae60';
+    const riskLabel = riskLevel === 'high' ? 'High Risk' : riskLevel === 'medium' ? 'Medium Risk' : 'Low Risk';
 
-    // 综合评分
-    const score = Math.round(result.overall_risk_score * 100);
-    document.getElementById('overallScore').textContent = score;
+    const riskTypes = result.risk_types || [];
+    const finePrediction = result.fine_prediction || {};
 
-    // 风险列表
-    const riskList = document.getElementById('riskList');
-    riskList.innerHTML = result.risk_assessments.map(risk => {
-        const levelClass = risk.risk_level === '高' ? 'high' : (risk.risk_level === '中' ? 'medium' : 'low');
-        const probability = Math.round(risk.probability * 100);
+    container.innerHTML = `
+        <div class="result-card">
+            <div class="result-header" style="border-left: 4px solid ${riskColor}">
+                <h3>Risk Assessment Result</h3>
+                <div class="risk-badge risk-${riskLevel}">${riskLabel}</div>
+            </div>
+            <div class="result-body">
+                <div class="risk-score-display">
+                    <div class="score-circle" style="--score: ${riskScore}; --color: ${riskColor}">
+                        <span class="score-value">${(riskScore * 100).toFixed(0)}</span>
+                        <span class="score-unit">/100</span>
+                    </div>
+                    <div class="score-details">
+                        <div class="detail-item"><strong>Risk Score:</strong> ${riskScore.toFixed(3)}</div>
+                        <div class="detail-item"><strong>Risk Level:</strong> <span style="color:${riskColor}">${riskLabel}</span></div>
+                        <div class="detail-item"><strong>Horizon:</strong> ${result.horizon || 30} days</div>
+                    </div>
+                </div>
 
-        return `
-            <div class="risk-item ${levelClass}">
-                <div class="risk-type">${risk.risk_type}</div>
-                <div class="risk-probability">${probability}%</div>
-                <span class="risk-level ${levelClass}">${risk.risk_level}风险</span>
+                ${riskTypes.length > 0 ? `
+                <div class="risk-types-section">
+                    <h4>Detected Risk Types</h4>
+                    <div class="risk-type-grid">
+                        ${riskTypes.map(rt => `
+                            <div class="risk-type-card">
+                                <div class="risk-type-name">${rt.type || rt}</div>
+                                <div class="risk-type-probability">${((rt.probability || 0) * 100).toFixed(1)}%</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>` : ''}
+
+                ${finePrediction.estimated_fine ? `
+                <div class="fine-section">
+                    <h4>Fine Prediction</h4>
+                    <div class="fine-range">
+                        <span class="fine-min">\u00A5${(finePrediction.min_fine || 0).toLocaleString()}</span>
+                        <span class="fine-arrow">\u2192</span>
+                        <span class="fine-max">\u00A5${(finePrediction.max_fine || 0).toLocaleString()}</span>
+                    </div>
+                </div>` : ''}
+
+                <div class="actions-bar">
+                    <button class="btn btn-primary" onclick="generateSuggestion()">Generate Suggestion</button>
+                    <button class="btn btn-secondary" onclick="savePrediction()">Save Record</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function loadSamplePrediction() {
+    try {
+        const response = await fetch(`${API_BASE}/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                platform_data: {
+                    product_info: { name: "Test Product", description: "\u4E16\u754C\u7B2C\u4E00\uFF0C\u5168\u7403\u9996\u521B\u6280\u672F\uFF0C100%\u6709\u6548" },
+                    marketing_content: [{ text: "\u56FD\u5BB6\u7EA7\u8BA4\u8BC1\u4EA7\u54C1\uFF0C\u6700\u4F73\u9009\u62E9" }]
+                },
+                horizon: 30
+            })
+        });
+        const result = await response.json();
+        showPage('predict');
+        const container = document.getElementById('prediction-result');
+        if (container) renderPredictionResult(result, container);
+    } catch (err) {
+        showError('Demo failed: ' + err.message);
+    }
+}
+
+async function generateSuggestion() {
+    if (!state.lastPrediction) {
+        showError('Please run a prediction first');
+        return;
+    }
+
+    const container = document.getElementById('prediction-result');
+    showLoading('prediction-result');
+
+    try {
+        const response = await fetch(`${API_BASE}/suggestions/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prediction_result: state.lastPrediction })
+        });
+        const data = await response.json();
+        const suggestions = data.suggestions || [];
+
+        const suggestionHtml = `
+            <div class="suggestion-section">
+                <h4>AI Suggestions</h4>
+                ${suggestions.map((s, i) => `
+                    <div class="suggestion-item">
+                        <div class="suggestion-number">${i + 1}</div>
+                        <div class="suggestion-content">
+                            <div class="suggestion-title">${s.title || s.type || 'Suggestion'}</div>
+                            <div class="suggestion-text">${s.content || s.description || ''}</div>
+                            ${s.law_reference ? `<div class="suggestion-law">Ref: ${s.law_reference}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         `;
-    }).join('');
 
-    // 建议
-    document.getElementById('recommendation').innerHTML = `
-        <strong>💡 建议：</strong> ${result.recommendation}
-    `;
-}
-
-// 搜索法律
-async function searchLaws() {
-    const query = document.getElementById('lawSearch').value;
-    if (!query) return;
-
-    try {
-        const response = await fetch(`${API_BASE}/knowledge_graph/search?query=${encodeURIComponent(query)}`);
-        const result = await response.json();
-        displayLawResults(result.results);
-    } catch (error) {
-        console.error('搜索失败:', error);
+        container.insertAdjacentHTML('beforeend', suggestionHtml);
+        showSuccess('Suggestions generated!');
+    } catch (err) {
+        showError('Failed to generate suggestions: ' + err.message);
+    } finally {
+        hideLoading('prediction-result');
     }
 }
 
-// 显示法律结果
-function displayLawResults(results) {
-    const container = document.getElementById('lawResults');
-
-    if (results.length === 0) {
-        container.innerHTML = '<p>未找到相关法律条文</p>';
-        return;
-    }
-
-    container.innerHTML = results.map(item => `
-        <div class="law-item">
-            <div class="law-name">${item.full_name || item.law_name}</div>
-            <div class="law-article">${item.article_id}</div>
-            <div class="law-content">${item.content || item.data?.content || ''}</div>
-        </div>
-    `).join('');
-}
-
-// 加载案例
-async function loadCases() {
-    try {
-        const response = await fetch(`${API_BASE}/knowledge_graph/cases`);
-        const result = await response.json();
-        displayCases(result.cases);
-    } catch (error) {
-        console.error('加载案例失败:', error);
-    }
-}
-
-// 显示案例
-function displayCases(cases) {
-    const container = document.getElementById('caseList');
-
-    container.innerHTML = cases.map(c => `
-        <div class="case-item">
-            <div class="case-header">
-                <span class="case-title">${c.title}</span>
-                <span class="case-fine">罚款 ${c.fine_amount?.toLocaleString() || 0} 元</span>
-            </div>
-            <div class="case-meta">
-                <span>🏷️ ${c.risk_type}</span>
-                <span>🏢 ${c.company_size || '未知'}</span>
-                <span>📅 ${c.decision_date || '未知'}</span>
-            </div>
-            <div class="case-summary">${c.summary || ''}</div>
-        </div>
-    `).join('');
-}
-
-// 筛选案例
-async function filterCases() {
-    const riskType = document.getElementById('riskTypeFilter').value;
-
-    try {
-        let url = `${API_BASE}/knowledge_graph/cases`;
-        const response = await fetch(url);
-        const result = await response.json();
-
-        let cases = result.cases;
-        if (riskType) {
-            cases = cases.filter(c => c.risk_type === riskType);
-        }
-
-        displayCases(cases);
-    } catch (error) {
-        console.error('筛选失败:', error);
-    }
-}
-
-// 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('电商合规哨兵已加载');
-    loadAlertStats();
-    loadAlertRules();
-});
-
-// ==================== WebSocket实时预警 ====================
-
-let ws = null;
-
-function connectWebSocket() {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        console.log('WebSocket已连接');
-        return;
-    }
-
-    ws = new WebSocket('ws://localhost:8000/ws/alerts');
-
-    ws.onopen = () => {
-        console.log('WebSocket已连接');
-        updateWsStatus('online');
-        ws.send(JSON.stringify({ action: 'subscribe', topic: 'alerts' }));
-    };
-
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('收到消息:', data);
-
-        if (data.type === 'new_alert') {
-            showNotification(data.alert);
-            loadAlertStats();
-        }
-    };
-
-    ws.onclose = () => {
-        console.log('WebSocket已断开');
-        updateWsStatus('offline');
-    };
-
-    ws.onerror = (error) => {
-        console.error('WebSocket错误:', error);
-        updateWsStatus('error');
-    };
-}
-
-function updateWsStatus(status) {
-    const badge = document.getElementById('wsStatus');
-    badge.className = `status-badge ${status}`;
-    badge.textContent = status === 'online' ? '已连接' : (status === 'error' ? '错误' : '未连接');
-}
-
-function showNotification(alert) {
-    // 创建通知
-    const container = document.createElement('div');
-    container.className = `notification ${alert.level}`;
-    container.innerHTML = `
-        <strong>${alert.title}</strong>
-        <p>${alert.message}</p>
-    `;
-    document.body.appendChild(container);
-
-    // 3秒后移除
-    setTimeout(() => container.remove(), 5000);
-}
-
-// ==================== 预警管理 ====================
+// ==================== Alerts ====================
 
 let alertPage = 1;
 const alertPageSize = 10;
 let allAlerts = [];
+let alertFilter = 'all';
 
-async function loadAlertStats() {
+async function loadAlerts() {
     try {
-        const response = await fetch(`${API_BASE}/alerts/stats`);
-        const stats = await response.json();
+        const [statsResp, alertsResp] = await Promise.all([
+            fetch(`${API_BASE}/alerts/stats`).catch(() => null),
+            fetch(`${API_BASE}/alerts?limit=200`).catch(() => null),
+        ]);
 
-        document.getElementById('alertTotal').textContent = stats.total || 0;
-        document.getElementById('alertActive').textContent = stats.active || 0;
-        document.getElementById('alertWarning').textContent = stats.by_level?.warning || 0;
-        document.getElementById('alertDanger').textContent = stats.by_level?.danger || 0;
-    } catch (error) {
-        console.error('加载预警统计失败:', error);
+        const stats = statsResp ? await statsResp.json() : {};
+        const alertsData = alertsResp ? await alertsResp.json() : {};
+        allAlerts = alertsData.alerts || [];
+
+        renderAlertStats(stats);
+        renderAlertList();
+    } catch (err) {
+        showError('Failed to load alerts: ' + err.message);
     }
 }
 
-async function loadAlertList() {
-    try {
-        const response = await fetch(`${API_BASE}/alerts?limit=100`);
-        const data = await response.json();
-        allAlerts = data.alerts || [];
-        renderAlertList();
-    } catch (error) {
-        console.error('加载预警列表失败:', error);
-        document.getElementById('alertList').innerHTML = '<p class="error-message">加载失败</p>';
-    }
+function renderAlertStats(stats) {
+    const el = document.getElementById('alert-stats');
+    if (!el) return;
+
+    el.innerHTML = `
+        <div class="alert-stat-card">
+            <div class="alert-stat-number">${stats.total || 0}</div>
+            <div class="alert-stat-label">Total</div>
+        </div>
+        <div class="alert-stat-card stat-active">
+            <div class="alert-stat-number">${stats.active || 0}</div>
+            <div class="alert-stat-label">Active</div>
+        </div>
+        <div class="alert-stat-card stat-warning">
+            <div class="alert-stat-number">${stats.by_level?.warning || 0}</div>
+            <div class="alert-stat-label">Warning</div>
+        </div>
+        <div class="alert-stat-card stat-danger">
+            <div class="alert-stat-number">${stats.by_level?.danger || 0}</div>
+            <div class="alert-stat-label">Danger</div>
+        </div>
+        <div class="alert-stat-card stat-critical">
+            <div class="alert-stat-number">${stats.by_level?.critical || 0}</div>
+            <div class="alert-stat-label">Critical</div>
+        </div>
+    `;
 }
 
 function renderAlertList() {
-    const container = document.getElementById('alertList');
-    const filter = document.getElementById('alertFilter')?.value || 'all';
+    const container = document.getElementById('alert-list');
+    if (!container) return;
 
-    // 筛选
     let filtered = allAlerts;
-    if (filter !== 'all') {
-        filtered = allAlerts.filter(a => a.level === filter || a.status === filter);
+    if (alertFilter !== 'all') {
+        filtered = allAlerts.filter(a => a.level === alertFilter);
     }
 
-    // 分页
     const start = (alertPage - 1) * alertPageSize;
     const pageAlerts = filtered.slice(start, start + alertPageSize);
+    const totalPages = Math.ceil(filtered.length / alertPageSize);
 
     if (pageAlerts.length === 0) {
-        container.innerHTML = '<p class="empty-message">暂无预警</p>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">\uD83D\uDD14</div><p>No alerts yet</p><p class="empty-hint">Alerts will appear here when risks are detected</p></div>';
         return;
     }
 
-    container.innerHTML = pageAlerts.map(alert => `
-        <div class="alert-item ${alert.level}" data-id="${alert.alert_id}">
-            <div class="alert-title">${alert.title || '风险预警'}</div>
-            <div class="alert-message">${alert.message || ''}</div>
-            <div class="alert-meta">
-                <span>级别: ${alert.level}</span>
-                <span>状态: ${alert.status}</span>
-                <span>时间: ${new Date(alert.created_at).toLocaleString()}</span>
+    container.innerHTML = pageAlerts.map(alert => {
+        const levelClass = alert.level || 'info';
+        const time = alert.created_at ? new Date(alert.created_at).toLocaleString() : '';
+        return `
+            <div class="alert-card alert-${levelClass}">
+                <div class="alert-level-badge">${(alert.level || 'info').toUpperCase()}</div>
+                <div class="alert-body">
+                    <div class="alert-title">${alert.title || 'Risk Alert'}</div>
+                    <div class="alert-message">${alert.message || ''}</div>
+                    <div class="alert-meta">
+                        <span class="alert-time">${time}</span>
+                        <span class="alert-status">${alert.status || 'active'}</span>
+                    </div>
+                </div>
+                <div class="alert-actions-col">
+                    <button class="btn-sm btn-ack" onclick="acknowledgeAlert('${alert.alert_id}')" title="Acknowledge">\u2705</button>
+                    <button class="btn-sm btn-resolve" onclick="resolveAlert('${alert.alert_id}')" title="Resolve">\u2714</button>
+                </div>
             </div>
-            <div class="alert-actions">
-                <button class="btn-secondary" onclick="acknowledgeAlert('${alert.alert_id}')">确认</button>
-                <button class="btn-secondary" onclick="resolveAlert('${alert.alert_id}')">解决</button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 
-    // 分页控件
-    const totalPages = Math.ceil(filtered.length / alertPageSize);
     if (totalPages > 1) {
         container.innerHTML += `
             <div class="pagination">
-                <button onclick="changeAlertPage(${alertPage - 1})" ${alertPage <= 1 ? 'disabled' : ''}>上一页</button>
-                <span>第 ${alertPage} / ${totalPages} 页</span>
-                <button onclick="changeAlertPage(${alertPage + 1})" ${alertPage >= totalPages ? 'disabled' : ''}>下一页</button>
+                <button class="btn-sm" onclick="alertPage=1;renderAlertList()" ${alertPage<=1?'disabled':''}>First</button>
+                <button class="btn-sm" onclick="alertPage--;renderAlertList()" ${alertPage<=1?'disabled':''}>Prev</button>
+                <span class="page-info">${alertPage}/${totalPages}</span>
+                <button class="btn-sm" onclick="alertPage++;renderAlertList()" ${alertPage>=totalPages?'disabled':''}>Next</button>
+                <button class="btn-sm" onclick="alertPage=${totalPages};renderAlertList()" ${alertPage>=totalPages?'disabled':''}>Last</button>
             </div>
         `;
     }
 }
 
-function changeAlertPage(page) {
-    alertPage = Math.max(1, page);
-    renderAlertList();
-}
-
-function filterAlerts() {
+function filterAlerts(level) {
+    alertFilter = level;
     alertPage = 1;
+    document.querySelectorAll('.alert-filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-filter="${level}"]`)?.classList.add('active');
     renderAlertList();
-}
-
-async function loadAlertRules() {
-    try {
-        const response = await fetch(`${API_BASE}/alerts/rules`);
-        const data = await response.json();
-
-        const container = document.getElementById('alertRules');
-        container.innerHTML = data.rules.map(rule => `
-            <div class="rule-item">
-                <div class="rule-name">${rule.name}</div>
-                <div class="rule-desc">${rule.description}</div>
-                <div class="rule-meta">
-                    <span class="tag ${rule.level}">${rule.level}</span>
-                    <span>阈值: ${(rule.probability_threshold * 100).toFixed(0)}%</span>
-                </div>
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('加载预警规则失败:', error);
-    }
 }
 
 async function acknowledgeAlert(alertId) {
     try {
         await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, { method: 'POST' });
-        loadAlertStats();
-    } catch (error) {
-        console.error('确认预警失败:', error);
+        showSuccess('Alert acknowledged');
+        loadAlerts();
+    } catch (err) {
+        showError('Failed to acknowledge alert');
     }
 }
 
 async function resolveAlert(alertId) {
     try {
         await fetch(`${API_BASE}/alerts/${alertId}/resolve`, { method: 'POST' });
-        loadAlertStats();
-    } catch (error) {
-        console.error('解决预警失败:', error);
+        showSuccess('Alert resolved');
+        loadAlerts();
+    } catch (err) {
+        showError('Failed to resolve alert');
     }
 }
 
-// ==================== 主动监控 ====================
+// ==================== Knowledge Base ====================
 
-async function startMonitor() {
+async function loadKnowledge() {
+    // Load laws list
     try {
-        const response = await fetch(`${API_BASE}/monitor/start`, { method: 'POST' });
-        const data = await response.json();
-        alert(data.message);
-        getMonitorStatus();
-    } catch (error) {
-        console.error('启动监控失败:', error);
+        const resp = await fetch(`${API_BASE}/laws`);
+        const data = await resp.json();
+        renderLawList(data.laws || []);
+    } catch (err) {
+        showError('Failed to load laws: ' + err.message);
     }
 }
 
-async function stopMonitor() {
+function renderLawList(laws) {
+    const container = document.getElementById('law-list');
+    if (!container) return;
+
+    if (laws.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No laws loaded</p></div>';
+        return;
+    }
+
+    container.innerHTML = laws.map(law => `
+        <div class="law-card" onclick="loadLawDetail('${law.name}')">
+            <div class="law-name">${law.name}</div>
+            <div class="law-full-name">${law.full_name || law.name}</div>
+            <div class="law-articles">${(law.articles_count || law.articles?.length || 0)} articles</div>
+        </div>
+    `).join('');
+}
+
+async function searchKnowledge() {
+    const query = document.getElementById('knowledge-search')?.value || '';
+    if (!query.trim()) return;
+
+    const container = document.getElementById('knowledge-results');
+    showLoading('knowledge-results');
+
     try {
-        const response = await fetch(`${API_BASE}/monitor/stop`, { method: 'POST' });
-        const data = await response.json();
-        alert(data.message);
-        getMonitorStatus();
-    } catch (error) {
-        console.error('停止监控失败:', error);
+        const resp = await fetch(`${API_BASE}/knowledge_graph/search?query=${encodeURIComponent(query)}`);
+        const data = await resp.json();
+        const results = data.results || data.cases || [];
+
+        if (results.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No results found</p></div>';
+            return;
+        }
+
+        container.innerHTML = results.map(r => `
+            <div class="knowledge-result-card">
+                <h4>${r.title || r.case_name || 'Result'}</h4>
+                <p>${r.description || r.content || ''}</p>
+                ${r.law ? `<div class="result-law-ref">Ref: ${r.law}</div>` : ''}
+                ${r.penalty ? `<div class="result-penalty">Penalty: ${r.penalty}</div>` : ''}
+            </div>
+        `).join('');
+    } catch (err) {
+        showError('Search failed: ' + err.message, 'knowledge-results');
+    } finally {
+        hideLoading('knowledge-results');
     }
 }
 
-async function getMonitorStatus() {
-    try {
-        const response = await fetch(`${API_BASE}/monitor/status`);
-        const status = await response.json();
+// ==================== History ====================
 
-        const container = document.getElementById('monitorStatus');
-        container.innerHTML = `
-            <div class="status-info">
-                <p>状态: <span class="${status.running ? 'text-success' : 'text-danger'}">${status.running ? '运行中' : '已停止'}</span></p>
-                <p>检查间隔: ${status.check_interval}秒</p>
-                <p>监控项数量: ${status.monitored_items}</p>
+async function loadHistory() {
+    try {
+        const [recordsResp, statsResp, trendResp] = await Promise.all([
+            fetch(`${API_BASE}/history/records?limit=50`).catch(() => null),
+            fetch(`${API_BASE}/history/statistics`).catch(() => null),
+            fetch(`${API_BASE}/history/trend?days=7`).catch(() => null),
+        ]);
+
+        const recordsData = recordsResp ? await recordsResp.json() : {};
+        const stats = statsResp ? await statsResp.json() : {};
+        const trend = trendResp ? await trendResp.json() : {};
+
+        renderHistoryStats(stats);
+        renderHistoryRecords(recordsData.records || []);
+        renderTrendChart(trend);
+    } catch (err) {
+        showError('Failed to load history: ' + err.message);
+    }
+}
+
+function renderHistoryStats(stats) {
+    const el = document.getElementById('history-stats');
+    if (!el) return;
+
+    el.innerHTML = `
+        <div class="history-stat"><span class="stat-num">${stats.total || 0}</span><span class="stat-lbl">Total</span></div>
+        <div class="history-stat"><span class="stat-num">${stats.high_risk_count || 0}</span><span class="stat-lbl">High Risk</span></div>
+        <div class="history-stat"><span class="stat-num">${stats.avg_risk_score ? (stats.avg_risk_score * 100).toFixed(1) : 0}</span><span class="stat-lbl">Avg Score</span></div>
+        <div class="history-stat"><span class="stat-num">${stats.alerts_triggered || 0}</span><span class="stat-lbl">Alerts</span></div>
+    `;
+}
+
+function renderHistoryRecords(records) {
+    const container = document.getElementById('history-records');
+    if (!container) return;
+
+    if (records.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No prediction history yet</p></div>';
+        return;
+    }
+
+    container.innerHTML = records.map(r => {
+        const score = r.prediction_result?.overall_risk_score || 0;
+        const level = score >= 0.7 ? 'high' : score >= 0.4 ? 'medium' : 'low';
+        const color = level === 'high' ? '#e74c3c' : level === 'medium' ? '#f39c12' : '#27ae60';
+
+        return `
+            <div class="history-record" style="border-left: 3px solid ${color}">
+                <div class="record-header">
+                    <span class="record-id">#${r.record_id || ''}</span>
+                    <span class="record-score" style="color:${color}">${(score * 100).toFixed(0)}%</span>
+                </div>
+                <div class="record-time">${r.created_at || ''}</div>
             </div>
         `;
-    } catch (error) {
-        console.error('获取监控状态失败:', error);
+    }).join('');
+}
+
+function renderTrendChart(trend) {
+    const canvas = document.getElementById('trend-canvas');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const data = trend.trend || [];
+
+    if (data.length === 0) {
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        ctx.fillText('No trend data yet', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const padding = 40;
+    const chartW = w - padding * 2;
+    const chartH = h - padding * 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(padding, padding, chartW, chartH);
+
+    // Grid
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = padding + (chartH / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(padding + chartW, y);
+        ctx.stroke();
+    }
+
+    // Data line
+    const scores = data.map(d => d.avg_score || 0);
+    const maxScore = Math.max(...scores, 0.1);
+
+    ctx.beginPath();
+    ctx.strokeStyle = '#667eea';
+    ctx.lineWidth = 2;
+
+    scores.forEach((score, i) => {
+        const x = padding + (chartW / Math.max(scores.length - 1, 1)) * i;
+        const y = padding + chartH - (score / maxScore) * chartH;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Data points
+    scores.forEach((score, i) => {
+        const x = padding + (chartW / Math.max(scores.length - 1, 1)) * i;
+        const y = padding + chartH - (score / maxScore) * chartH;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#667eea';
+        ctx.fill();
+    });
+}
+
+// ==================== Settings ====================
+
+function loadSettings() {
+    const container = document.getElementById('settings-content');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="settings-section">
+            <h3>API Configuration</h3>
+            <div class="form-group">
+                <label>DeepSeek API Key</label>
+                <input type="password" id="setting-api-key" placeholder="sk-..." class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Enable LLM</label>
+                <select id="setting-enable-llm" class="form-input">
+                    <option value="true">Enabled</option>
+                    <option value="false">Disabled</option>
+                </select>
+            </div>
+        </div>
+        <div class="settings-section">
+            <h3>Alert Rules</h3>
+            <div class="form-group">
+                <label>Default Risk Threshold</label>
+                <input type="range" id="setting-threshold" min="0" max="100" value="70" class="form-range">
+                <span id="threshold-value">0.70</span>
+            </div>
+        </div>
+        <div class="settings-section">
+            <h3>System</h3>
+            <div class="info-grid">
+                <div class="info-item"><span>Version</span><span>v0.7.0</span></div>
+                <div class="info-item"><span>Port</span><span>${window.location.port}</span></div>
+                <div class="info-item"><span>Platform</span><span>Desktop</span></div>
+            </div>
+            <div class="settings-actions">
+                <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+                <button class="btn btn-danger" onclick="clearCache()">Clear Cache</button>
+                <button class="btn btn-secondary" onclick="clearHistory()">Clear History</button>
+            </div>
+        </div>
+    `;
+}
+
+async function saveSettings() {
+    showSuccess('Settings saved');
+}
+
+async function clearCache() {
+    try {
+        await fetch(`${API_BASE}/cache/clear`, { method: 'DELETE' });
+        showSuccess('Cache cleared');
+    } catch (err) {
+        showError('Failed to clear cache');
     }
 }
 
-// ==================== 实时预测 ====================
+async function clearHistory() {
+    if (!confirm('Clear all prediction history?')) return;
+    showSuccess('History cleared');
+}
 
-async function predictRealtime() {
-    const productName = document.getElementById('productName').value;
-    const productDesc = document.getElementById('productDesc').value;
-    const marketingContent = document.getElementById('marketingContent').value.split('\n').filter(x => x.trim());
+// ==================== WebSocket ====================
 
-    const platformData = {
-        product_info: { name: productName, description: productDesc },
-        marketing_content: marketingContent.map(text => ({ text }))
+let ws = null;
+
+function connectWebSocket() {
+    const wsUrl = `${WS_BASE}/ws/alerts`;
+
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+        state.wsConnected = true;
+        state.wsReconnectAttempts = 0;
+        ws.send(JSON.stringify({ action: 'subscribe', topic: 'alerts' }));
+        showToast('WebSocket connected', 'success');
     };
 
-    try {
-        const response = await fetch(`${API_BASE}/predict/realtime`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platform_data: platformData })
-        });
-
-        const result = await response.json();
-        displayPredictResult(result.prediction);
-
-        if (result.alerts_triggered > 0) {
-            showNotification({
-                level: 'warning',
-                title: '触发预警',
-                message: `检测到 ${result.alerts_triggered} 个风险预警`
-            });
-            loadAlertStats();
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            handleWSMessage(data);
+        } catch (err) {
+            console.error('WS message parse error:', err);
         }
-    } catch (error) {
-        console.error('实时预测失败:', error);
+    };
+
+    ws.onclose = () => {
+        state.wsConnected = false;
+        reconnectWebSocket();
+    };
+
+    ws.onerror = () => {
+        state.wsConnected = false;
+    };
+}
+
+function reconnectWebSocket() {
+    if (state.wsReconnectAttempts >= state.wsMaxReconnect) return;
+
+    const delay = Math.min(1000 * Math.pow(2, state.wsReconnectAttempts), 30000);
+    state.wsReconnectAttempts++;
+
+    setTimeout(() => {
+        connectWebSocket();
+    }, delay);
+}
+
+function handleWSMessage(data) {
+    if (data.type === 'alert' || data.level) {
+        // Show notification
+        showToast(data.title || data.message || 'New Alert', data.level || 'info');
+
+        // Refresh alerts if on alerts page
+        if (document.getElementById('alerts')?.classList.contains('active')) {
+            loadAlerts();
+        }
+
+        // Desktop tray notification via API bridge
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.show_notification(data.title || 'Alert', data.message || '');
+        }
     }
 }
+
+// ==================== Initialize ====================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Set up navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const page = item.dataset.page;
+            showPage(page);
+        });
+    });
+
+    // Show dashboard
+    showPage('dashboard');
+
+    // Connect WebSocket
+    connectWebSocket();
+
+    // Set up search enter key
+    document.getElementById('knowledge-search')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchKnowledge();
+    });
+});

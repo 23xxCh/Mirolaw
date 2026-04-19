@@ -898,6 +898,37 @@ async def get_task_stats():
 
 # ==================== 前端页面 ====================
 
+import sys
+from pathlib import Path
+
+def _get_frontend_dir() -> Path:
+    """Get frontend directory (PyInstaller compatible)"""
+    if hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS) / "frontend" / "public"
+    return Path(__file__).parent.parent / "frontend" / "public"
+
+
+FRONTEND_DIR = _get_frontend_dir()
+
+if FRONTEND_DIR.exists():
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+
+    @app.get("/", tags=["Frontend"])
+    async def serve_index():
+        """Serve frontend index.html"""
+        return FileResponse(str(FRONTEND_DIR / "index.html"))
+
+    @app.get("/{path:path}", tags=["Frontend"])
+    async def serve_frontend(path: str):
+        """Serve frontend static files"""
+        file_path = FRONTEND_DIR / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(FRONTEND_DIR / "index.html"))
+
 @app.get("/", tags=["Frontend"])
 async def index():
     """前端首页"""

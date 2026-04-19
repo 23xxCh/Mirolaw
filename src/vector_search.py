@@ -154,6 +154,35 @@ class LegalVectorSearch:
             self.engine.build_index(documents)
             logger.info(f"Built legal vector index with {len(documents)} articles")
 
+    def _do_initialize(self):
+        """Actually initialize the model and index"""
+        if not self._check_available():
+            return False
+
+        try:
+            from sentence_transformers import SentenceTransformer
+            import faiss
+            import numpy as np
+
+            logger.info("Loading sentence-transformers model...")
+            self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+
+            # Build index
+            if self.documents:
+                texts = [doc.get('content', '') for doc in self.documents]
+                embeddings = self.model.encode(texts)
+                dimension = embeddings.shape[1]
+                self.index = faiss.IndexFlatL2(dimension)
+                self.index.add(np.array(embeddings).astype('float32'))
+
+            self._initialized = True
+            logger.info("Vector search engine initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize vector search: {e}")
+            self._available = False
+            return False
+
     def search(self, query: str, top_k: int = 5) -> List[Dict]:
         """搜索相关法律条文"""
         if not self.engine.is_available():
